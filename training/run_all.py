@@ -29,6 +29,8 @@ MODEL_MODULES = [
 SUBSAMPLE_MODELS = {"Support Vector Machine", "K-Nearest Neighbors"}
 MAX_SUBSAMPLE_ROWS = 8000
 
+BALANCED_MODELS = {"K-Nearest Neighbors"}
+
 BEST_MODEL_PATH = Path(__file__).parent / "models" / "best_model.joblib"
 
 
@@ -43,6 +45,15 @@ def build_model_for(module, y_train):
     if module is xgboost_model:
         return build_xgboost_with_class_weight(y_train)
     return module.build_model()
+
+
+def maybe_balance(name, X_train, y_train, random_state=42):
+    if name not in BALANCED_MODELS:
+        return X_train, y_train
+
+    smallest = y_train.value_counts().min()
+    balanced = y_train.groupby(y_train).sample(n=smallest, random_state=random_state).index
+    return X_train.loc[balanced], y_train.loc[balanced]
 
 
 def maybe_subsample(name, X_train, y_train, random_state=42):
@@ -68,7 +79,8 @@ def train_and_evaluate_all():
             ("model", model),
         ])
 
-        X_fit, y_fit = maybe_subsample(name, X_train, y_train)
+        X_fit, y_fit = maybe_balance(name, X_train, y_train)
+        X_fit, y_fit = maybe_subsample(name, X_fit, y_fit)
 
         print(f"Training {name} on {len(X_fit):,} rows...")
         pipeline.fit(X_fit, y_fit)
