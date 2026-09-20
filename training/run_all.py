@@ -49,6 +49,20 @@ def build_model_for(module, y_train):
 
 
 def maybe_subsample(name, X_train, y_train, random_state=42):
+    if name == "K-Nearest Neighbors":
+        minority_count = y_train.value_counts().min()
+        samples_per_class = min(MAX_SUBSAMPLE_ROWS // 2, minority_count)
+
+        indices = []
+        for label in y_train.unique():
+            class_indices = y_train[y_train == label].sample(
+                n=samples_per_class,
+                random_state=random_state,
+            ).index
+            indices.extend(class_indices)
+
+        return X_train.loc[indices], y_train.loc[indices]
+
     if name not in SUBSAMPLE_MODELS or len(X_train) <= MAX_SUBSAMPLE_ROWS:
         return X_train, y_train
 
