@@ -28,6 +28,39 @@ FIELD_HELP = {
 
 FIELD_ORDER = list(FIELD_HELP.keys())
 
+# What each field will actually accept. A tuple is an inclusive numeric range,
+# a set is the complete list of valid NHANES codes.
+FIELD_DOMAINS = {
+    "RIDAGEYR": (18, 85),
+    "RIAGENDR": {1, 2},
+    "RIDRETH1": {1, 2, 3, 4, 5},
+    "DMDEDUC2": {1, 2, 3, 4, 5},
+    "DMDMARTL": {1, 2, 3, 4, 5, 6},
+    "INDFMPIR": (0.0, 5.0),
+    "DMDCITZN": {1, 2},
+    "DMDHHSIZ": (1, 7),
+}
+
+
+def describe_domain(field):
+    domain = FIELD_DOMAINS[field]
+    if isinstance(domain, set):
+        return "one of " + ", ".join(str(code) for code in sorted(domain))
+    return f"between {domain[0]} and {domain[1]}"
+
+
+def validate_field(field, value):
+    """Return the value if it is valid for this field, else raise ValueError."""
+    domain = FIELD_DOMAINS[field]
+    if isinstance(domain, set):
+        if value != int(value) or int(value) not in domain:
+            raise ValueError(f"{field} must be {describe_domain(field)}")
+        return int(value)
+    low, high = domain
+    if not low <= value <= high:
+        raise ValueError(f"{field} must be {describe_domain(field)}")
+    return value
+
 
 def build_arg_parser():
     parser = argparse.ArgumentParser(
@@ -48,10 +81,11 @@ def prompt_for_missing(person):
         while True:
             raw_value = input(f"{field} ({FIELD_HELP[field]}): ").strip()
             try:
-                person[field] = float(raw_value)
+                person[field] = validate_field(field, float(raw_value))
                 break
-            except ValueError:
-                print("Please enter a number.")
+            except ValueError as error:
+                message = str(error)
+                print(message if field in message else f"Please enter a number, {describe_domain(field)}.")
 
     return person
 
