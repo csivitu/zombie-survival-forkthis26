@@ -29,6 +29,14 @@ MODEL_MODULES = [
 SUBSAMPLE_MODELS = {"Support Vector Machine", "K-Nearest Neighbors"}
 MAX_SUBSAMPLE_ROWS = 8000
 
+# Every other model can be told the classes are skewed: Logistic Regression,
+# SVM and Random Forest take class_weight="balanced", XGBoost takes
+# scale_pos_weight. KNN has no such parameter - it decides by counting the
+# neighbours around a point, and with ~84% survivors most neighbourhoods are
+# survivors regardless of the features. The only lever is the data it is given,
+# so it gets a class-balanced sample instead of a plain random one.
+BALANCED_MODELS = {"K-Nearest Neighbors"}
+
 BEST_MODEL_PATH = Path(__file__).parent / "models" / "best_model.joblib"
 
 
@@ -45,7 +53,21 @@ def build_model_for(module, y_train):
     return module.build_model()
 
 
+def balanced_subsample(X_train, y_train, max_rows, random_state=42):
+    """Draw an equal number of rows per outcome so neighbour votes are not pre-decided."""
+    per_class = max_rows // 2
+    keep = []
+    for label in sorted(y_train.unique()):
+        label_rows = y_train[y_train == label]
+        keep.extend(label_rows.sample(n=min(per_class, len(label_rows)),
+                                      random_state=random_state).index)
+    return X_train.loc[keep], y_train.loc[keep]
+
+
 def maybe_subsample(name, X_train, y_train, random_state=42):
+    if name in BALANCED_MODELS:
+        return balanced_subsample(X_train, y_train, MAX_SUBSAMPLE_ROWS, random_state)
+
     if name not in SUBSAMPLE_MODELS or len(X_train) <= MAX_SUBSAMPLE_ROWS:
         return X_train, y_train
 
