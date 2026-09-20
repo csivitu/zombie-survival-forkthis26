@@ -80,7 +80,7 @@ const FIELDS = [
     key: "RIDAGEYR", type: "range", label: "Age",
     note: "The single biggest factor in the model. Younger = better odds. Sorry, older folks — the data is what it is.",
     min: 18, max: 85, step: 1,
-    fmt: (v) => (v >= 85 ? "85 or older" : `${v} years old`),
+    fmt: (v) =>`${v} years old`,
   },
   {
     key: "RIAGENDR", type: "choice", label: "Sex",
