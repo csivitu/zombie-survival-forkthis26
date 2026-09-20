@@ -42,7 +42,7 @@ FEATURE_ORDER = [
 
 
 class Person(BaseModel):
-    RIDAGEYR: float = Field(ge=18, le=85, description="Age in years")
+    RIDAGEYR: float = Field(ge=18, le=80, description="Age in years (80 = 80 or older)")
     RIAGENDR: int = Field(ge=1, le=2, description="1 = Male, 2 = Female")
     RIDRETH1: int = Field(ge=1, le=5, description="Race/ethnicity code")
     DMDEDUC2: int = Field(ge=1, le=5, description="Education level")
