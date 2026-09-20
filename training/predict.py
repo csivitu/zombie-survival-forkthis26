@@ -26,6 +26,18 @@ FIELD_HELP = {
     "DMDHHSIZ": "People in household, 1 to 7 (7 = 7 or more)",
 }
 
+# Valid ranges for each field - matches the API validation in app/main.py
+FIELD_RANGES = {
+    "RIDAGEYR": (18, 85),
+    "RIAGENDR": (1, 2),
+    "RIDRETH1": (1, 5),
+    "DMDEDUC2": (1, 5),
+    "DMDMARTL": (1, 6),
+    "INDFMPIR": (0, 5),
+    "DMDCITZN": (1, 2),
+    "DMDHHSIZ": (1, 7),
+}
+
 FIELD_ORDER = list(FIELD_HELP.keys())
 
 
@@ -40,18 +52,42 @@ def build_arg_parser():
     return parser
 
 
+def validate_field(field, value):
+    """Validate that a value is within the acceptable range for the field."""
+    if value is None:
+        return False
+    
+    min_val, max_val = FIELD_RANGES[field]
+    if not (min_val <= value <= max_val):
+        print(f"Invalid value for {field}. Must be between {min_val} and {max_val}.")
+        return False
+    
+    # For categorical fields, also check that it's an integer
+    if field not in ["RIDAGEYR", "INDFMPIR"]:
+        if not float(value).is_integer():
+            print(f"Invalid value for {field}. Must be an integer.")
+            return False
+    
+    return True
+
 def prompt_for_missing(person):
     for field in FIELD_ORDER:
+        # First validate any existing value from command line
         if person.get(field) is not None:
-            continue
-
-        while True:
-            raw_value = input(f"{field} ({FIELD_HELP[field]}): ").strip()
-            try:
-                person[field] = float(raw_value)
-                break
-            except ValueError:
-                print("Please enter a number.")
+            if not validate_field(field, person[field]):
+                person[field] = None  # Force re-prompt
+        
+        # Prompt for missing or invalid values
+        if person.get(field) is None:
+            while True:
+                raw_value = input(f"{field} ({FIELD_HELP[field]}): ").strip()
+                try:
+                    value = float(raw_value)
+                    if validate_field(field, value):
+                        person[field] = value
+                        break
+                except ValueError:
+                    print("Please enter a valid number.")
 
     return person
 
