@@ -28,6 +28,33 @@ FIELD_HELP = {
 
 FIELD_ORDER = list(FIELD_HELP.keys())
 
+ALLOWED_CODES = {
+    "RIAGENDR": [1, 2],
+    "RIDRETH1": [1, 2, 3, 4, 5],
+    "DMDEDUC2": [1, 2, 3, 4, 5],
+    "DMDMARTL": [1, 2, 3, 4, 5, 6],
+    "DMDCITZN": [1, 2],
+}
+
+ALLOWED_RANGE = {
+    "RIDAGEYR": (18, 85),
+    "INDFMPIR": (0, 5),
+    "DMDHHSIZ": (1, 7),
+}
+
+
+def check_value(field, value):
+    if field in ALLOWED_CODES and value not in ALLOWED_CODES[field]:
+        codes = ", ".join(str(code) for code in ALLOWED_CODES[field])
+        raise ValueError(f"{field} has to be one of {codes}")
+
+    if field in ALLOWED_RANGE:
+        low, high = ALLOWED_RANGE[field]
+        if not low <= value <= high:
+            raise ValueError(f"{field} has to be between {low} and {high}")
+
+    return value
+
 
 def build_arg_parser():
     parser = argparse.ArgumentParser(
@@ -48,10 +75,16 @@ def prompt_for_missing(person):
         while True:
             raw_value = input(f"{field} ({FIELD_HELP[field]}): ").strip()
             try:
-                person[field] = float(raw_value)
-                break
+                value = float(raw_value)
             except ValueError:
                 print("Please enter a number.")
+                continue
+
+            try:
+                person[field] = check_value(field, value)
+                break
+            except ValueError as error:
+                print(error)
 
     return person
 
@@ -65,8 +98,17 @@ def load_best_model():
 
 
 def main():
-    args = build_arg_parser().parse_args()
+    parser = build_arg_parser()
+    args = parser.parse_args()
     person = {field: getattr(args, field) for field in FIELD_ORDER}
+
+    for field, value in person.items():
+        if value is not None:
+            try:
+                check_value(field, value)
+            except ValueError as error:
+                parser.error(str(error))
+
     person = prompt_for_missing(person)
 
     pipeline = load_best_model()
