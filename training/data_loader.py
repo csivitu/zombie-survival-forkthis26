@@ -11,10 +11,11 @@ PROCESSED_PATH = PROCESSED_DIR / "demographics_mortality_clean.csv"
 
 
 # Features identified in candidate_features.py / analyze_features.py as
-# usable predictors. RIDRETH3 and DMDEDUC3 are intentionally excluded here:
+# usable predictors. RIDRETH3, DMDEDUC3 and DMDYRSUS are left out here:
 # RIDRETH3 is ~60% missing because it wasn't collected before the 2007-2008
-# cycle (RIDRETH1 covers every cycle instead), and DMDEDUC3 is ~93% missing
-# because it only applies to participants aged 6-19.
+# cycle (RIDRETH1 covers every cycle instead), DMDEDUC3 is ~93% missing
+# because it only applies to participants aged 6-19, and DMDYRSUS is ~75%
+# missing because it is only asked to people who weren't born in the US.
 CANDIDATE_FEATURES = [
     "RIDAGEYR",
     "RIAGENDR",
@@ -23,7 +24,6 @@ CANDIDATE_FEATURES = [
     "DMDMARTL",
     "INDFMPIR",
     "DMDCITZN",
-    "DMDYRSUS",
     "DMDHHSIZ",
 ]
 
@@ -192,10 +192,15 @@ def clean_dataset(df, features=CANDIDATE_FEATURES, missing_threshold=MISSING_THR
         column for column in ["SEQN", "MORTSTAT"] + list(features)
         if column in df.columns
     ]
+    for column in features:
+        if column not in keep_columns:
+            print(f"{column} is not in the merged data, skipping it")
     df = df[keep_columns]
 
     missing_fraction = df.isna().mean()
     dropped = missing_fraction[missing_fraction > missing_threshold].index
+    for column in dropped:
+        print(f"{column} dropped, {missing_fraction[column]:.1%} of the rows are missing it")
     df = df.drop(columns=dropped)
 
     return df
