@@ -15,7 +15,7 @@ import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -40,16 +40,23 @@ FEATURE_ORDER = [
     "DMDCITZN",
 ]
 
+TOP_CODED = {"RIDAGEYR": 85, "INDFMPIR": 5, "DMDHHSIZ": 7}
+
 
 class Person(BaseModel):
-    RIDAGEYR: float = Field(ge=18, le=85, description="Age in years")
+    RIDAGEYR: float = Field(ge=18, description="Age in years, 85 counts as 85 or older")
     RIAGENDR: int = Field(ge=1, le=2, description="1 = Male, 2 = Female")
     RIDRETH1: int = Field(ge=1, le=5, description="Race/ethnicity code")
     DMDEDUC2: int = Field(ge=1, le=5, description="Education level")
     DMDMARTL: int = Field(ge=1, le=6, description="Marital status")
-    INDFMPIR: float = Field(ge=0, le=5, description="Family income-to-poverty ratio")
+    INDFMPIR: float = Field(ge=0, description="Family income-to-poverty ratio, 5 counts as 5 or more")
     DMDCITZN: int = Field(ge=1, le=2, description="1 = Citizen, 2 = Not a citizen")
-    DMDHHSIZ: int = Field(ge=1, le=7, description="People in household")
+    DMDHHSIZ: int = Field(ge=1, description="People in household, 7 counts as 7 or more")
+
+    @field_validator("RIDAGEYR", "INDFMPIR", "DMDHHSIZ")
+    @classmethod
+    def use_top_code(cls, value, info):
+        return min(value, TOP_CODED[info.field_name])
 
 
 class Prediction(BaseModel):
