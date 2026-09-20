@@ -23,7 +23,6 @@ CANDIDATE_FEATURES = [
     "DMDMARTL",
     "INDFMPIR",
     "DMDCITZN",
-    "DMDYRSUS",
     "DMDHHSIZ",
 ]
 
