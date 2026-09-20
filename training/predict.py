@@ -27,6 +27,28 @@ FIELD_HELP = {
 }
 
 FIELD_ORDER = list(FIELD_HELP.keys())
+def validate_field(field, value):
+    choices = {
+        "RIAGENDR": {1, 2},
+        "RIDRETH1": {1, 2, 3, 4, 5},
+        "DMDEDUC2": {1, 2, 3, 4, 5},
+        "DMDMARTL": {1, 2, 3, 4, 5, 6},
+        "DMDCITZN": {1, 2},
+    }
+
+    ranges = {
+        "RIDAGEYR": (18, 85),
+        "INDFMPIR": (0, 5),
+        "DMDHHSIZ": (1, 7),
+    }
+
+    if field in choices and value not in choices[field]:
+        raise ValueError(f"Invalid value for {field}: {value}")
+
+    if field in ranges and not ranges[field][0] <= value <= ranges[field][1]:
+        raise ValueError(f"Invalid value for {field}: {value}")
+
+    return value
 
 
 def build_arg_parser():
@@ -35,7 +57,9 @@ def build_arg_parser():
     )
 
     for field, help_text in FIELD_HELP.items():
-        parser.add_argument(f"--{field.lower()}", dest=field, type=float, help=help_text)
+        parser.add_argument(f"--{field.lower()}", dest=field, 
+                            type=lambda value, field=field: validate_field(field,
+                             float(value)), help=help_text)
 
     return parser
 
@@ -48,7 +72,7 @@ def prompt_for_missing(person):
         while True:
             raw_value = input(f"{field} ({FIELD_HELP[field]}): ").strip()
             try:
-                person[field] = float(raw_value)
+                person[field] = validate_field(field, float(raw_value))
                 break
             except ValueError:
                 print("Please enter a number.")
