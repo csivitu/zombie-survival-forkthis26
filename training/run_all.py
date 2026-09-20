@@ -1,6 +1,7 @@
 import joblib
 import pandas as pd
 from pathlib import Path
+from sklearn.calibration import calibration_curve
 from sklearn.metrics import accuracy_score, roc_auc_score
 from sklearn.pipeline import Pipeline
 
@@ -74,10 +75,18 @@ def train_and_evaluate_all():
         pipeline.fit(X_fit, y_fit)
 
         proba_deceased = pipeline.predict_proba(X_test)[:, 1]
+        prob_true, prob_pred = calibration_curve(
+            y_test,
+            proba_deceased,
+            n_bins=10,
+        )
         predicted_class = pipeline.predict(X_test)
 
         auc = roc_auc_score(y_test, proba_deceased)
         accuracy = accuracy_score(y_test, predicted_class)
+        print("Calibration:")
+        for predicted, actual in zip(prob_pred, prob_true):
+            print(f"  Predicted: {predicted:.2f}  Actual: {actual:.2f}")
 
         results.append({
             "name": name,
