@@ -15,6 +15,8 @@ PROCESSED_PATH = PROCESSED_DIR / "demographics_mortality_clean.csv"
 # RIDRETH3 is ~60% missing because it wasn't collected before the 2007-2008
 # cycle (RIDRETH1 covers every cycle instead), and DMDEDUC3 is ~93% missing
 # because it only applies to participants aged 6-19.
+# DMDYRSUS is also excluded: it's ~74% missing (only collected for non-US-born
+# citizens) and would be dropped by the 50% missing threshold anyway.
 CANDIDATE_FEATURES = [
     "RIDAGEYR",
     "RIAGENDR",
@@ -23,7 +25,6 @@ CANDIDATE_FEATURES = [
     "DMDMARTL",
     "INDFMPIR",
     "DMDCITZN",
-    "DMDYRSUS",
     "DMDHHSIZ",
 ]
 
@@ -34,7 +35,6 @@ MISSING_CODES = {
     "DMDEDUC2": [7, 9],
     "DMDMARTL": [77, 99],
     "DMDCITZN": [7, 9],
-    "DMDYRSUS": [77, 99],
 }
 
 # Drop any feature that is missing above this fraction of rows after the
