@@ -42,6 +42,10 @@ MISSING_CODES = {
 # the full merged dataset through clean_dataset instead of CANDIDATE_FEATURES).
 MISSING_THRESHOLD = 0.5
 
+# Age is top-coded at 80 in the 2007-2018 cycles, which is the majority of the
+# pooled data, so 80 is the highest age the model can actually distinguish.
+AGE_TOP_CODE = 80
+
 
 DEMO_FILES = [
     "DEMO.xpt",
@@ -187,6 +191,12 @@ def clean_dataset(df, features=CANDIDATE_FEATURES, missing_threshold=MISSING_THR
             df[column] = df[column].replace(codes, np.nan)
 
     df = df.dropna(subset=["MORTSTAT"])
+
+    # NHANES top-codes age at 85 for 1999-2006 and at 80 for 2007-2018. Pooling the
+    # cycles leaves two different ceilings in one column, so harmonise on the lower
+    # one: every 80+ respondent is then represented the same way.
+    if "RIDAGEYR" in df.columns:
+        df["RIDAGEYR"] = df["RIDAGEYR"].clip(upper=AGE_TOP_CODE)
 
     keep_columns = [
         column for column in ["SEQN", "MORTSTAT"] + list(features)
