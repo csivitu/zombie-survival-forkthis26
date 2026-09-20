@@ -1,7 +1,8 @@
 import joblib
+import numpy as np
 import pandas as pd
 from pathlib import Path
-from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.metrics import accuracy_score, brier_score_loss, roc_auc_score
 from sklearn.pipeline import Pipeline
 
 from preprocessing import build_preprocessor, load_train_test_split
@@ -29,6 +30,8 @@ MODEL_MODULES = [
 SUBSAMPLE_MODELS = {"Support Vector Machine", "K-Nearest Neighbors"}
 MAX_SUBSAMPLE_ROWS = 8000
 
+CALIBRATION_BINS = 10
+
 BEST_MODEL_PATH = Path(__file__).parent / "models" / "best_model.joblib"
 
 
@@ -52,6 +55,42 @@ def maybe_subsample(name, X_train, y_train, random_state=42):
     X_sample = X_train.sample(n=MAX_SUBSAMPLE_ROWS, random_state=random_state)
     y_sample = y_train.loc[X_sample.index]
     return X_sample, y_sample
+
+
+def calibration_table(y_test, proba, bins=CALIBRATION_BINS):
+    happened = np.asarray(y_test, dtype=float)
+    edges = np.linspace(0, 1, bins + 1)
+    bucket = np.clip(np.digitize(proba, edges[1:-1]), 0, bins - 1)
+    table = []
+
+    for b in range(bins):
+        inside = bucket == b
+        if not inside.any():
+            continue
+        table.append({
+            "low": edges[b],
+            "high": edges[b + 1],
+            "people": int(inside.sum()),
+            "predicted": float(proba[inside].mean()),
+            "happened": float(happened[inside].mean()),
+        })
+    return table
+
+
+def calibration_error(table, total):
+    return sum(row["people"] / total * abs(row["predicted"] - row["happened"]) for row in table)
+
+
+def print_calibration(result):
+    print("\n" + "=" * 70)
+    print(f"CALIBRATION OF {result['name']} (held-out test set)")
+    print("=" * 70)
+    print(f"{'model said':<16}{'people':>8}{'average said':>15}{'actually died':>16}")
+
+    for row in result["calibration"]:
+        band = f"{row['low']:.0%} - {row['high']:.0%}"
+        print(f"{band:<16}{row['people']:>8,}{row['predicted']:>14.1%}{row['happened']:>16.1%}")
+    print(f"\nExpected calibration error: {result['ece']:.4f}")
 
 
 def train_and_evaluate_all():
@@ -78,12 +117,16 @@ def train_and_evaluate_all():
 
         auc = roc_auc_score(y_test, proba_deceased)
         accuracy = accuracy_score(y_test, predicted_class)
+        calibration = calibration_table(y_test, proba_deceased)
 
         results.append({
             "name": name,
             "pipeline": pipeline,
             "auc": auc,
             "accuracy": accuracy,
+            "brier": brier_score_loss(y_test, proba_deceased),
+            "ece": calibration_error(calibration, len(y_test)),
+            "calibration": calibration,
         })
 
     return results, X_test, y_test
@@ -100,7 +143,9 @@ def print_comparison(results):
         print(
             f"{rank}. {result['name']:<25} "
             f"AUC: {result['auc']:.4f}   "
-            f"Accuracy: {result['accuracy']:.4f}"
+            f"Accuracy: {result['accuracy']:.4f}   "
+            f"Brier: {result['brier']:.4f}   "
+            f"Calibration error: {result['ece']:.4f}"
         )
 
     return ranked[0]
@@ -132,6 +177,8 @@ def main():
     print(f"BEST MODEL: {best['name']} (AUC: {best['auc']:.4f})")
     print(f"Saved to: {BEST_MODEL_PATH}")
     print("=" * 70)
+
+    print_calibration(best)
 
     # Demo: show what a single prediction looks like using the best model,
     # on the first person in the held-out test set.
