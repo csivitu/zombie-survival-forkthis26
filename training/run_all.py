@@ -1,7 +1,8 @@
 import joblib
 import pandas as pd
 from pathlib import Path
-from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.calibration import calibration_curve
+from sklearn.metrics import accuracy_score, brier_score_loss, roc_auc_score
 from sklearn.pipeline import Pipeline
 
 from preprocessing import build_preprocessor, load_train_test_split
@@ -78,12 +79,17 @@ def train_and_evaluate_all():
 
         auc = roc_auc_score(y_test, proba_deceased)
         accuracy = accuracy_score(y_test, predicted_class)
+        # AUC only judges ranking. Brier judges the probability itself, which is
+        # the number actually shown to the user.
+        brier = brier_score_loss(y_test, proba_deceased)
 
         results.append({
             "name": name,
             "pipeline": pipeline,
             "auc": auc,
             "accuracy": accuracy,
+            "brier": brier,
+            "proba": proba_deceased,
         })
 
     return results, X_test, y_test
@@ -100,10 +106,30 @@ def print_comparison(results):
         print(
             f"{rank}. {result['name']:<25} "
             f"AUC: {result['auc']:.4f}   "
-            f"Accuracy: {result['accuracy']:.4f}"
+            f"Accuracy: {result['accuracy']:.4f}   "
+            f"Brier: {result['brier']:.4f}"
         )
 
     return ranked[0]
+
+
+def print_calibration(result, y_test, n_bins=10):
+    """Compare predicted probabilities against how often the outcome really occurred."""
+    predicted, observed = calibration_curve(
+        y_test, result["proba"], n_bins=n_bins, strategy="quantile"
+    )
+
+    print("\n" + "=" * 70)
+    print(f"CALIBRATION - {result['name']} (Brier score: {result['brier']:.4f}, lower is better)")
+    print("=" * 70)
+    print(f"{'predicted risk':>16}{'observed rate':>16}{'gap':>10}")
+    for mean_predicted, fraction_positive in zip(observed, predicted):
+        gap = fraction_positive - mean_predicted
+        print(f"{mean_predicted:>15.1%}{fraction_positive:>16.1%}{gap:>+10.1%}")
+
+    worst = max(abs(f - m) for m, f in zip(observed, predicted))
+    print(f"\nlargest gap between predicted and observed: {worst:.1%}")
+    print("a well calibrated model keeps every gap small: when it says 30%, about 30% die.")
 
 
 def predict_survival_percentage(pipeline, person):
