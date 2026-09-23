@@ -28,6 +28,13 @@ CANDIDATE_FEATURES = [
     "DMDHHSIZ",
 ]
 
+# DMDYRSUS (years living in the US) is only asked of respondents who are not
+# US-born, so it is ~81% missing and is always discarded by MISSING_THRESHOLD
+# below. It is left out of the candidate list rather than silently dropped.
+EXCLUDED_FEATURES = {
+    "DMDYRSUS": "only asked of non-US-born respondents; ~81% missing",
+}
+
 # NHANES uses these numeric codes for "Refused" / "Don't know" answers on
 # categorical fields. They are not real category values, so they need to be
 # converted to NaN rather than treated as ordinary responses.
@@ -197,6 +204,18 @@ def clean_dataset(df, features=CANDIDATE_FEATURES, missing_threshold=MISSING_THR
     missing_fraction = df.isna().mean()
     dropped = missing_fraction[missing_fraction > missing_threshold].index
     df = df.drop(columns=dropped)
+
+    # Say so out loud: a feature vanishing here is otherwise invisible until
+    # someone notices the model was never trained on it.
+    for column in dropped:
+        print(
+            f"[clean_dataset] dropping '{column}': "
+            f"{missing_fraction[column]:.1%} missing (threshold {missing_threshold:.0%})"
+        )
+
+    requested = [c for c in features if c in EXCLUDED_FEATURES]
+    for column in requested:
+        print(f"[clean_dataset] note: '{column}' is excluded by design - {EXCLUDED_FEATURES[column]}")
 
     return df
 
